@@ -1,0 +1,231 @@
+{
+  "@@locale": "en",
+  "@@last_modified": "2025-06-21T12:00:00.000Z",
+  
+  "appTitle": "P2P Chat",
+  "@appTitle": {
+    "description": "The title of the application"
+  },
+  
+  "welcome": "Welcome",
+  "@welcome": {
+    "description": "Welcome message"
+  },
+  
+  "login": "Login",
+  "logout": "Logout",
+  "profile": "Profile",
+  "settings": "Settings",
+  "home": "Home",
+  "chat": "Chat",
+  "aiChat": "AI Chat",
+  "groups": "Groups",
+  "contacts": "Contacts",
+  
+  "name": "Name",
+  "email": "Email",
+  "phone": "Phone",
+  "save": "Save",
+  "cancel": "Cancel",
+  "delete": "Delete",
+  "edit": "Edit",
+  "add": "Add",
+  "remove": "Remove",
+  "share": "Share",
+  "copy": "Copy",
+  "paste": "Paste",
+  "search": "Search",
+  "refresh": "Refresh",
+  "retry": "Retry",
+  "close": "Close",
+  "ok": "OK",
+  "yes": "Yes",
+  "no": "No",
+  "done": "Done",
+  "next": "Next",
+  "back": "Back",
+  "skip": "Skip",
+  "continue": "Continue",
+  
+  "connect": "Connect",
+  "disconnect": "Disconnect",
+  "connected": "Connected",
+  "disconnected": "Disconnected",
+  "connecting": "Connecting...",
+  "connectionFailed": "Connection Failed",
+  
+  "message": "Message",
+  "messages": "Messages",
+  "sendMessage": "Send Message",
+  "typeMessage": "Type a message...",
+  "noMessages": "No messages yet",
+  "messageDelivered": "Delivered",
+  "messageSent": "Sent",
+  "messageRead": "Read",
+  
+  "file": "File",
+  "files": "Files",
+  "image": "Image",
+  "images": "Images",
+  "video": "Video",
+  "videos": "Videos",
+  "audio": "Audio",
+  "voice": "Voice",
+  "document": "Document",
+  "location": "Location",
+  
+  "camera": "Camera",
+  "gallery": "Gallery",
+  "takePhoto": "Take Photo",
+  "recordVideo": "Record Video",
+  "recordVoice": "Record Voice",
+  "shareLocation": "Share Location",
+  "shareFile": "Share File",
+  
+  "qrCode": "QR Code",
+  "scanQR": "Scan QR",
+  "generateQR": "Generate QR",
+  "shareQR": "Share QR",
+  "qrScanner": "QR Scanner",
+  
+  "bluetooth": "Bluetooth",
+  "wifi": "WiFi",
+  "internet": "Internet",
+  "offline": "Offline",
+  "online": "Online",
+  
+  "notifications": "Notifications",
+  "notificationSettings": "Notification Settings",
+  "enableNotifications": "Enable Notifications",
+  "disableNotifications": "Disable Notifications",
+  
+  "privacy": "Privacy",
+  "security": "Security",
+  "encryption": "Encryption",
+  "endToEndEncryption": "End-to-End Encryption",
+  
+  "aiAssistant": "AI Assistant",
+  "aiSettings": "AI Settings",
+  "apiKey": "API Key",
+  "enterApiKey": "Enter API Key",
+  "testConnection": "Test Connection",
+  "connectionSuccessful": "Connection Successful",
+  
+  "group": "Group",
+  "createGroup": "Create Group",
+  "groupName": "Group Name",
+  "groupDescription": "Group Description",
+  "addMembers": "Add Members",
+  "removeMembers": "Remove Members",
+  "groupSettings": "Group Settings",
+  "leaveGroup": "Leave Group",
+  "deleteGroup": "Delete Group",
+  
+  "admin": "Admin",
+  "member": "Member",
+  "creator": "Creator",
+  "promoteToAdmin": "Promote to Admin",
+  "demoteFromAdmin": "Demote from Admin",
+  
+  "error": "Error",
+  "warning": "Warning",
+  "info": "Information",
+  "success": "Success",
+  
+  "permissionRequired": "Permission Required",
+  "permissionDenied": "Permission Denied",
+  "permissionGranted": "Permission Granted",
+  
+  "loading": "Loading...",
+  "processing": "Processing...",
+  "uploading": "Uploading...",
+  "downloading": "Downloading...",
+  
+  "darkMode": "Dark Mode",
+  "lightMode": "Light Mode",
+  "systemMode": "System Mode",
+  "theme": "Theme",
+  "language": "Language",
+  
+  "arabic": "Arabic",
+  "english": "English",
+  "egyptianArabic": "Egyptian Arabic",
+  
+  "about": "About",
+  "version": "Version",
+  "developer": "Developer",
+  "contact": "Contact",
+  "feedback": "Feedback",
+  "rateApp": "Rate App",
+  
+  "backup": "Backup",
+  "restore": "Restore",
+  "export": "Export",
+  "import": "Import",
+  
+  "clear": "Clear",
+  "clearAll": "Clear All",
+  "clearChat": "Clear Chat",
+  "clearHistory": "Clear History",
+  
+  "block": "Block",
+  "unblock": "Unblock",
+  "blocked": "Blocked",
+  "blockedUsers": "Blocked Users",
+  
+  "typing": "typing...",
+  "isTyping": "{name} is typing...",
+  "@isTyping": {
+    "description": "Typing indicator with name",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Ahmed"
+      }
+    }
+  },
+  
+  "lastSeen": "Last seen {time}",
+  "@lastSeen": {
+    "description": "Last seen time",
+    "placeholders": {
+      "time": {
+        "type": "String",
+        "example": "2 minutes ago"
+      }
+    }
+  },
+  
+  "messageCount": "{count, plural, =0{No messages} =1{1 message} other{{count} messages}}",
+  "@messageCount": {
+    "description": "Message count with pluralization",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "5"
+      }
+    }
+  },
+  
+  "fileSize": "File size: {size}",
+  "@fileSize": {
+    "description": "File size display",
+    "placeholders": {
+      "size": {
+        "type": "String",
+        "example": "2.5 MB"
+      }
+    }
+  },
+  
+  "connectionInfo": "Connected to {peerName}",
+  "@connectionInfo": {
+    "description": "Connection information",
+    "placeholders": {
+      "peerName": {
+        "type": "String",
+        "example": "Ahmed's Phone"
+      }
+    }
+  }
+}

@@ -1,0 +1,13 @@
+arb-dir: lib/l10n
+template-arb-file: app_en.arb
+output-localization-file: app_localizations.dart
+output-class: AppLocalizations
+output-dir: lib/l10n/generated
+nullable-getter: false
+synthetic-package: false
+header-file: lib/l10n/header.txt
+header: |
+  /// Generated file. Do not edit.
+  /// 
+  /// P2P Chat App Localizations
+  /// Supports: English, Arabic (Standard), Arabic (Egyptian)
