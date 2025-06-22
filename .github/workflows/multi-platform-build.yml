@@ -1,0 +1,344 @@
+name: Multi-Platform Build
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+        - debug
+        - release
+      platforms:
+        description: 'Platforms to build'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+        - all
+        - android
+        - web
+        - windows
+        - linux
+        - macos
+
+jobs:
+  # Android Build Job
+  build-android:
+    name: Build Android
+    runs-on: ubuntu-latest
+    if: github.event.inputs.platforms == 'all' || github.event.inputs.platforms == 'android' || github.event_name != 'workflow_dispatch'
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+        
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.24.0'
+        channel: 'stable'
+        cache: true
+        
+    - name: Get dependencies
+      run: flutter pub get
+      
+    - name: Generate code
+      run: |
+        flutter packages pub run build_runner build --delete-conflicting-outputs
+        flutter gen-l10n
+      continue-on-error: true
+      
+    - name: Build APK
+      run: |
+        if [ "${{ github.event.inputs.build_type }}" = "release" ] || [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+          flutter build apk --release --split-per-abi
+        else
+          flutter build apk --debug --split-per-abi
+        fi
+        
+    - name: Build App Bundle
+      run: |
+        if [ "${{ github.event.inputs.build_type }}" = "release" ] || [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+          flutter build appbundle --release
+        else
+          flutter build appbundle --debug
+        fi
+        
+    - name: Get build info
+      id: build_info
+      run: |
+        BUILD_TYPE="${{ github.event.inputs.build_type || 'release' }}"
+        echo "build_type=$BUILD_TYPE" >> $GITHUB_OUTPUT
+        
+        # Get APK files info
+        echo "APK files built:"
+        find build/app/outputs/flutter-apk/ -name "*.apk" -exec ls -lh {} \;
+        
+        # Get total APK size
+        TOTAL_SIZE=$(find build/app/outputs/flutter-apk/ -name "*.apk" -exec du -ch {} + | grep total | cut -f1)
+        echo "total_apk_size=$TOTAL_SIZE" >> $GITHUB_OUTPUT
+        
+        # Get App Bundle size
+        if [ "$BUILD_TYPE" = "release" ]; then
+          AAB_SIZE=$(du -h build/app/outputs/bundle/release/*.aab | cut -f1)
+        else
+          AAB_SIZE=$(du -h build/app/outputs/bundle/debug/*.aab | cut -f1)
+        fi
+        echo "aab_size=$AAB_SIZE" >> $GITHUB_OUTPUT
+        
+    - name: Upload Android artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: android-${{ steps.build_info.outputs.build_type }}-${{ github.run_number }}
+        path: |
+          build/app/outputs/flutter-apk/*.apk
+          build/app/outputs/bundle/**/*.aab
+        retention-days: 30
+
+  # Web Build Job
+  build-web:
+    name: Build Web
+    runs-on: ubuntu-latest
+    if: github.event.inputs.platforms == 'all' || github.event.inputs.platforms == 'web' || github.event_name != 'workflow_dispatch'
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.24.0'
+        channel: 'stable'
+        cache: true
+        
+    - name: Enable web support
+      run: flutter config --enable-web
+      
+    - name: Get dependencies
+      run: flutter pub get
+      
+    - name: Generate code
+      run: |
+        flutter packages pub run build_runner build --delete-conflicting-outputs
+        flutter gen-l10n
+      continue-on-error: true
+      
+    - name: Build Web
+      run: |
+        if [ "${{ github.event.inputs.build_type }}" = "release" ] || [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+          flutter build web --release --web-renderer html
+        else
+          flutter build web --debug --web-renderer html
+        fi
+        
+    - name: Get web build info
+      id: web_info
+      run: |
+        WEB_SIZE=$(du -sh build/web | cut -f1)
+        echo "web_size=$WEB_SIZE" >> $GITHUB_OUTPUT
+        
+        # Count files
+        FILE_COUNT=$(find build/web -type f | wc -l)
+        echo "file_count=$FILE_COUNT" >> $GITHUB_OUTPUT
+        
+    - name: Upload Web artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: web-${{ github.event.inputs.build_type || 'release' }}-${{ github.run_number }}
+        path: build/web/
+        retention-days: 30
+        
+    - name: Deploy to GitHub Pages (if main branch)
+      if: github.ref == 'refs/heads/main' && (github.event.inputs.build_type == 'release' || github.event_name != 'workflow_dispatch')
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: build/web
+
+  # Windows Build Job
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    if: github.event.inputs.platforms == 'all' || github.event.inputs.platforms == 'windows' || github.event_name != 'workflow_dispatch'
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.24.0'
+        channel: 'stable'
+        cache: true
+        
+    - name: Enable Windows support
+      run: flutter config --enable-windows-desktop
+      
+    - name: Get dependencies
+      run: flutter pub get
+      
+    - name: Generate code
+      run: |
+        flutter packages pub run build_runner build --delete-conflicting-outputs
+        flutter gen-l10n
+      continue-on-error: true
+      
+    - name: Build Windows
+      run: |
+        if ("${{ github.event.inputs.build_type }}" -eq "release" -or "${{ github.event_name }}" -ne "workflow_dispatch") {
+          flutter build windows --release
+        } else {
+          flutter build windows --debug
+        }
+        
+    - name: Create Windows installer
+      run: |
+        # Create a simple installer structure
+        $BUILD_TYPE = "${{ github.event.inputs.build_type }}"
+        if ($BUILD_TYPE -eq "") { $BUILD_TYPE = "release" }
+        
+        $INSTALLER_DIR = "build/windows/installer"
+        New-Item -ItemType Directory -Force -Path $INSTALLER_DIR
+        
+        # Copy build files
+        Copy-Item -Recurse "build/windows/x64/runner/$BUILD_TYPE/*" "$INSTALLER_DIR/"
+        
+        # Create a simple batch installer
+        @"
+        @echo off
+        echo Installing P2P Chat...
+        xcopy /E /I /Y "%~dp0*" "%LOCALAPPDATA%\P2PChat\"
+        echo Installation complete!
+        echo You can run P2P Chat from: %LOCALAPPDATA%\P2PChat\p2p_chat.exe
+        pause
+        "@ | Out-File -FilePath "$INSTALLER_DIR/install.bat" -Encoding ASCII
+        
+    - name: Get Windows build info
+      id: windows_info
+      run: |
+        $BUILD_TYPE = "${{ github.event.inputs.build_type }}"
+        if ($BUILD_TYPE -eq "") { $BUILD_TYPE = "release" }
+        
+        $EXE_SIZE = (Get-Item "build/windows/x64/runner/$BUILD_TYPE/p2p_chat.exe").Length / 1MB
+        echo "exe_size=$([math]::Round($EXE_SIZE, 2))MB" >> $env:GITHUB_OUTPUT
+        
+        $TOTAL_SIZE = (Get-ChildItem "build/windows/x64/runner/$BUILD_TYPE" -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB
+        echo "total_size=$([math]::Round($TOTAL_SIZE, 2))MB" >> $env:GITHUB_OUTPUT
+        
+    - name: Upload Windows artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-${{ github.event.inputs.build_type || 'release' }}-${{ github.run_number }}
+        path: |
+          build/windows/x64/runner/**/*
+          build/windows/installer/
+        retention-days: 30
+
+  # Linux Build Job
+  build-linux:
+    name: Build Linux
+    runs-on: ubuntu-latest
+    if: github.event.inputs.platforms == 'all' || github.event.inputs.platforms == 'linux' || github.event_name != 'workflow_dispatch'
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Install Linux dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+        
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.24.0'
+        channel: 'stable'
+        cache: true
+        
+    - name: Enable Linux support
+      run: flutter config --enable-linux-desktop
+      
+    - name: Get dependencies
+      run: flutter pub get
+      
+    - name: Generate code
+      run: |
+        flutter packages pub run build_runner build --delete-conflicting-outputs
+        flutter gen-l10n
+      continue-on-error: true
+      
+    - name: Build Linux
+      run: |
+        if [ "${{ github.event.inputs.build_type }}" = "release" ] || [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+          flutter build linux --release
+        else
+          flutter build linux --debug
+        fi
+        
+    - name: Create Linux AppImage
+      run: |
+        BUILD_TYPE="${{ github.event.inputs.build_type || 'release' }}"
+        
+        # Create AppDir structure
+        mkdir -p build/linux/AppDir/usr/bin
+        mkdir -p build/linux/AppDir/usr/lib
+        mkdir -p build/linux/AppDir/usr/share/applications
+        mkdir -p build/linux/AppDir/usr/share/icons/hicolor/256x256/apps
+        
+        # Copy application files
+        cp -r build/linux/x64/$BUILD_TYPE/bundle/* build/linux/AppDir/usr/bin/
+        
+        # Create desktop file
+        cat > build/linux/AppDir/usr/share/applications/p2p-chat.desktop << EOF
+        [Desktop Entry]
+        Type=Application
+        Name=P2P Chat
+        Comment=Secure Peer-to-Peer Messaging with AI
+        Exec=p2p_chat
+        Icon=p2p-chat
+        Categories=Network;Chat;
+        EOF
+        
+        # Create AppRun script
+        cat > build/linux/AppDir/AppRun << 'EOF'
+        #!/bin/bash
+        HERE="$(dirname "$(readlink -f "${0}")")"
+        exec "${HERE}/usr/bin/p2p_chat" "$@"
+        EOF
+        chmod +x build/linux/AppDir/AppRun
+        
+    - name: Get Linux build info
+      id: linux_info
+      run: |
+        BUILD_TYPE="${{ github.event.inputs.build_type || 'release' }}"
+        
+        BINARY_SIZE=$(du -h build/linux/x64/$BUILD_TYPE/bundle/p2p_chat | cut -f1)
+        echo "binary_size=$BINARY_SIZE" >> $GITHUB_OUTPUT
+        
+        TOTAL_SIZE=$(du -sh build/linux/x64/$BUILD_TYPE/bundle | cut -f1)
+        echo "total_size=$TOTAL_SIZE" >> $GITHUB_OUTPUT
+        
+    - name: Upload Linux artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux-${{ github.event.inputs.build_type || 'release' }}-${{ github.run_number }}
+        path: |
+          build/linux/x64/**/bundle/
+          build/linux/AppDir/
+        retention-days: 30

@@ -1,0 +1,106 @@
+name: macOS Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+        - debug
+        - release
+  push:
+    branches: [ main ]
+    paths:
+      - 'lib/**'
+      - 'macos/**'
+      - 'pubspec.yaml'
+
+jobs:
+  build-macos:
+    name: Build macOS
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.24.0'
+        channel: 'stable'
+        cache: true
+        
+    - name: Enable macOS support
+      run: flutter config --enable-macos-desktop
+      
+    - name: Get dependencies
+      run: flutter pub get
+      
+    - name: Generate code
+      run: |
+        flutter packages pub run build_runner build --delete-conflicting-outputs
+        flutter gen-l10n
+      continue-on-error: true
+      
+    - name: Build macOS
+      run: |
+        if [ "${{ github.event.inputs.build_type }}" = "release" ] || [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+          flutter build macos --release
+        else
+          flutter build macos --debug
+        fi
+        
+    - name: Create macOS DMG
+      run: |
+        BUILD_TYPE="${{ github.event.inputs.build_type || 'release' }}"
+        
+        # Install create-dmg if not available
+        if ! command -v create-dmg &> /dev/null; then
+          brew install create-dmg
+        fi
+        
+        # Create DMG
+        create-dmg \
+          --volname "P2P Chat" \
+          --volicon "macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_512.png" \
+          --window-pos 200 120 \
+          --window-size 600 300 \
+          --icon-size 100 \
+          --icon "P2P Chat.app" 175 120 \
+          --hide-extension "P2P Chat.app" \
+          --app-drop-link 425 120 \
+          "build/macos/P2P-Chat-$BUILD_TYPE.dmg" \
+          "build/macos/Build/Products/$BUILD_TYPE/"
+          
+    - name: Get macOS build info
+      id: macos_info
+      run: |
+        BUILD_TYPE="${{ github.event.inputs.build_type || 'release' }}"
+        
+        APP_SIZE=$(du -sh "build/macos/Build/Products/$BUILD_TYPE/p2p_chat.app" | cut -f1)
+        echo "app_size=$APP_SIZE" >> $GITHUB_OUTPUT
+        
+        if [ -f "build/macos/P2P-Chat-$BUILD_TYPE.dmg" ]; then
+          DMG_SIZE=$(du -h "build/macos/P2P-Chat-$BUILD_TYPE.dmg" | cut -f1)
+          echo "dmg_size=$DMG_SIZE" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Upload macOS artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: macos-${{ github.event.inputs.build_type || 'release' }}-${{ github.run_number }}
+        path: |
+          build/macos/Build/Products/**/*.app
+          build/macos/*.dmg
+        retention-days: 30
+        
+    - name: Upload DMG to release (if tag)
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: build/macos/*.dmg
+        token: ${{ secrets.GITHUB_TOKEN }}

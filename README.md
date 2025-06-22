@@ -149,34 +149,111 @@ lib/
    ./quick_start.sh
    ```
 
-## 🚀 GitHub Actions
+## 🚀 GitHub Actions - Multi-Platform Build System
 
-This project includes automated CI/CD workflows:
+This project includes comprehensive automated CI/CD workflows for all platforms:
 
-### Available Workflows
-- **Build APK** (`.github/workflows/build-apk.yml`)
-  - Builds debug/release APK automatically
-  - Runs on push to main/develop branches
-  - Manual trigger with build type selection
+### 📱 Available Workflows
 
-- **Continuous Integration** (`.github/workflows/ci.yml`)
-  - Runs tests and code analysis
-  - Security scanning with Trivy
-  - Dependency checking
-  - Performance testing
+#### 1. **Multi-Platform Build** (`.github/workflows/multi-platform-build.yml`)
+- **Android**: APK + App Bundle (ARM64, ARM, x86_64)
+- **Web**: Progressive Web App with HTML renderer
+- **Windows**: Desktop executable with installer
+- **Linux**: AppImage and native bundle
+- **Automatic**: Triggers on push to main/develop
 
-- **Release** (`.github/workflows/release.yml`)
-  - Creates releases with APK artifacts
-  - Generates release notes automatically
-  - Builds both APK and App Bundle
+#### 2. **Quick Build** (`.github/workflows/quick-build.yml`)
+- **Fast builds** for specific platforms
+- **Manual trigger** with platform selection
+- **Instant deployment** to GitHub Pages (web)
+- **Quick releases** for testing
 
-### Manual APK Build
-To manually trigger an APK build:
-1. Go to the "Actions" tab in GitHub
-2. Select "Build APK" workflow
-3. Click "Run workflow"
-4. Choose build type (debug/release)
-5. Download APK from artifacts
+#### 3. **Auto Release** (`.github/workflows/auto-release.yml`)
+- **All platforms** in one release
+- **Automatic versioning** with tags
+- **Release notes** generation
+- **Asset packaging** and distribution
+
+#### 4. **macOS Build** (`.github/workflows/macos-build.yml`)
+- **Native macOS** app bundle
+- **DMG installer** creation
+- **Code signing** support (with certificates)
+
+#### 5. **Continuous Integration** (`.github/workflows/ci.yml`)
+- **Code quality** checks
+- **Security scanning** with Trivy
+- **Dependency analysis**
+- **Performance testing**
+
+### 🎯 How to Build for Different Platforms
+
+#### 📱 **Android (APK + App Bundle)**
+```bash
+# Manual trigger
+1. Go to Actions → "Multi-Platform Build"
+2. Click "Run workflow"
+3. Select "android" platform
+4. Choose "release" build type
+5. Download from artifacts
+
+# Automatic
+- Push to main/develop branch
+- APK and App Bundle built automatically
+```
+
+#### 🌐 **Web Application**
+```bash
+# Manual trigger
+1. Go to Actions → "Quick Build"
+2. Select "web" platform
+3. Enable "Deploy to GitHub Pages"
+4. Access at: https://yussefgafer.github.io/last_try_p2p_chat_app
+
+# Automatic
+- Deploys to GitHub Pages on main branch push
+```
+
+#### 💻 **Windows Desktop**
+```bash
+# Manual trigger
+1. Go to Actions → "Multi-Platform Build"
+2. Select "windows" platform
+3. Download Windows executable from artifacts
+4. Includes installer batch file
+```
+
+#### 🐧 **Linux Desktop**
+```bash
+# Manual trigger
+1. Go to Actions → "Multi-Platform Build"
+2. Select "linux" platform
+3. Download AppImage or native bundle
+4. Supports all major Linux distributions
+```
+
+#### 🍎 **macOS Desktop**
+```bash
+# Manual trigger
+1. Go to Actions → "macOS Build"
+2. Download DMG installer
+3. Native macOS app bundle
+```
+
+#### 🚀 **All Platforms at Once**
+```bash
+# Create complete release
+1. Go to Actions → "Auto Release"
+2. Enter version (e.g., v1.0.0)
+3. All platforms built automatically
+4. Complete release with all downloads
+```
+
+### 📦 Download Links
+
+After successful builds, download from:
+- **GitHub Releases**: https://github.com/Yussefgafer/last_try_p2p_chat_app/releases
+- **GitHub Actions Artifacts**: https://github.com/Yussefgafer/last_try_p2p_chat_app/actions
+- **GitHub Pages (Web)**: https://yussefgafer.github.io/last_try_p2p_chat_app
 
 ## 🔒 Security Features
 

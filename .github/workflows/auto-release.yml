@@ -1,0 +1,307 @@
+name: Auto Release All Platforms
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        type: string
+      create_tag:
+        description: 'Create new tag'
+        required: true
+        default: true
+        type: boolean
+
+jobs:
+  create-tag:
+    name: Create Release Tag
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.create_tag == 'true'
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Create and push tag
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        git tag ${{ github.event.inputs.version }}
+        git push origin ${{ github.event.inputs.version }}
+
+  build-all-platforms:
+    name: Build All Platforms
+    needs: [create-tag]
+    if: always() && (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch')
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: android
+            build-command: |
+              flutter build apk --release --split-per-abi
+              flutter build appbundle --release
+            artifact-path: |
+              build/app/outputs/flutter-apk/*.apk
+              build/app/outputs/bundle/release/*.aab
+            
+          - os: ubuntu-latest
+            platform: web
+            build-command: |
+              flutter config --enable-web
+              flutter build web --release --web-renderer html
+            artifact-path: build/web/
+            
+          - os: ubuntu-latest
+            platform: linux
+            build-command: |
+              sudo apt-get update
+              sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+              flutter config --enable-linux-desktop
+              flutter build linux --release
+            artifact-path: build/linux/x64/release/bundle/
+            
+          - os: windows-latest
+            platform: windows
+            build-command: |
+              flutter config --enable-windows-desktop
+              flutter build windows --release
+            artifact-path: build/windows/x64/runner/Release/
+            
+          - os: macos-latest
+            platform: macos
+            build-command: |
+              flutter config --enable-macos-desktop
+              flutter build macos --release
+            artifact-path: build/macos/Build/Products/Release/
+    
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Java (for Android)
+      if: matrix.platform == 'android'
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+        
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.24.0'
+        channel: 'stable'
+        cache: true
+        
+    - name: Get dependencies
+      run: flutter pub get
+      
+    - name: Generate code
+      run: |
+        flutter packages pub run build_runner build --delete-conflicting-outputs
+        flutter gen-l10n
+      continue-on-error: true
+      
+    - name: Build for ${{ matrix.platform }}
+      run: ${{ matrix.build-command }}
+      
+    - name: Create platform-specific package
+      run: |
+        VERSION="${{ github.event.inputs.version || github.ref_name }}"
+        PLATFORM="${{ matrix.platform }}"
+        
+        # Create release directory
+        mkdir -p "release/$PLATFORM"
+        
+        # Copy build artifacts
+        if [ "$PLATFORM" = "web" ]; then
+          cp -r build/web/* "release/$PLATFORM/"
+          cd release && zip -r "p2p-chat-$VERSION-web.zip" web/
+        elif [ "$PLATFORM" = "android" ]; then
+          cp build/app/outputs/flutter-apk/*.apk "release/$PLATFORM/" 2>/dev/null || true
+          cp build/app/outputs/bundle/release/*.aab "release/$PLATFORM/" 2>/dev/null || true
+        elif [ "$PLATFORM" = "linux" ]; then
+          cp -r build/linux/x64/release/bundle/* "release/$PLATFORM/"
+          cd release && tar -czf "p2p-chat-$VERSION-linux.tar.gz" linux/
+        elif [ "$PLATFORM" = "windows" ]; then
+          cp -r build/windows/x64/runner/Release/* "release/$PLATFORM/" 2>/dev/null || true
+          # Create Windows zip on Windows
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            powershell "Compress-Archive -Path 'release/windows/*' -DestinationPath 'release/p2p-chat-$VERSION-windows.zip'"
+          fi
+        elif [ "$PLATFORM" = "macos" ]; then
+          cp -r build/macos/Build/Products/Release/* "release/$PLATFORM/" 2>/dev/null || true
+          cd release && tar -czf "p2p-chat-$VERSION-macos.tar.gz" macos/
+        fi
+      shell: bash
+      
+    - name: Upload platform artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.platform }}-release-${{ github.run_number }}
+        path: |
+          release/
+          ${{ matrix.artifact-path }}
+        retention-days: 90
+
+  create-release:
+    name: Create GitHub Release
+    needs: [build-all-platforms]
+    runs-on: ubuntu-latest
+    if: always() && needs.build-all-platforms.result == 'success'
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts/
+        
+    - name: Prepare release assets
+      run: |
+        VERSION="${{ github.event.inputs.version || github.ref_name }}"
+        mkdir -p release-assets
+        
+        # Organize artifacts
+        find artifacts/ -name "*.apk" -exec cp {} release-assets/ \;
+        find artifacts/ -name "*.aab" -exec cp {} release-assets/ \;
+        find artifacts/ -name "*.zip" -exec cp {} release-assets/ \;
+        find artifacts/ -name "*.tar.gz" -exec cp {} release-assets/ \;
+        find artifacts/ -name "*.dmg" -exec cp {} release-assets/ \;
+        
+        # List all release assets
+        echo "Release assets:"
+        ls -la release-assets/
+        
+    - name: Generate release notes
+      id: release_notes
+      run: |
+        VERSION="${{ github.event.inputs.version || github.ref_name }}"
+        
+        cat > release_notes.md << EOF
+        # P2P Chat Release $VERSION
+        
+        ## 🚀 What's New
+        - Complete P2P chat application with AI integration
+        - End-to-end encryption for secure messaging
+        - Multi-platform support (Android, Web, Windows, Linux, macOS)
+        - WebRTC and Bluetooth connectivity
+        - Multi-language support (Arabic, Egyptian, English)
+        - Material 3 design with RTL support
+        
+        ## 📱 Downloads
+        
+        ### Android
+        - **Universal APK**: \`app-release.apk\` - Works on all Android devices
+        - **Split APKs**: Architecture-specific APKs for smaller downloads
+        - **App Bundle**: \`app-release.aab\` - For Google Play Store
+        
+        ### 🌐 Web
+        - **Web App**: \`p2p-chat-$VERSION-web.zip\` - Extract and serve with any web server
+        - **Live Demo**: Available at GitHub Pages
+        
+        ### 💻 Desktop
+        - **Windows**: \`p2p-chat-$VERSION-windows.zip\` - Extract and run
+        - **Linux**: \`p2p-chat-$VERSION-linux.tar.gz\` - Extract and run
+        - **macOS**: \`p2p-chat-$VERSION-macos.tar.gz\` - Extract and run
+        
+        ## 🔧 Technical Details
+        - **Build Number**: ${{ github.run_number }}
+        - **Commit**: ${{ github.sha }}
+        - **Flutter Version**: 3.24.0
+        - **Target SDK**: Android 34
+        - **Min SDK**: Android 21
+        
+        ## 🛡️ Security
+        - All builds are created from source code
+        - End-to-end encryption enabled
+        - No data collection or tracking
+        - Open source and auditable
+        
+        ## 📋 Installation
+        
+        ### Android
+        1. Download the appropriate APK for your device
+        2. Enable "Install from unknown sources" in Android settings
+        3. Install the APK
+        4. Grant necessary permissions
+        5. Add your Gemini API key in settings
+        
+        ### Web
+        1. Download and extract the web package
+        2. Serve the files using any web server
+        3. Access through your browser
+        
+        ### Desktop
+        1. Download the appropriate package for your OS
+        2. Extract the files
+        3. Run the executable
+        4. Grant necessary permissions
+        
+        ## 🐛 Known Issues
+        - Voice calls feature is in development
+        - Video calls feature is in development
+        - Some advanced P2P features may need refinement
+        
+        ## 📞 Support
+        If you encounter any issues, please create an issue on GitHub.
+        
+        ## 🙏 Acknowledgments
+        - Google for the Gemini AI API
+        - Flutter team for the amazing framework
+        - WebRTC community for P2P communication protocols
+        EOF
+        
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ github.event.inputs.version || github.ref_name }}
+        name: P2P Chat ${{ github.event.inputs.version || github.ref_name }}
+        body_path: release_notes.md
+        draft: false
+        prerelease: false
+        files: release-assets/*
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Deploy Web to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: artifacts/web-release-*/build/web
+        cname: p2pchat.github.io
+        
+  notify-completion:
+    name: Notify Build Completion
+    needs: [create-release]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Notify success
+      if: needs.create-release.result == 'success'
+      run: |
+        echo "🎉 Multi-platform release completed successfully!"
+        echo "Version: ${{ github.event.inputs.version || github.ref_name }}"
+        echo "All platforms built and released!"
+        echo ""
+        echo "Available downloads:"
+        echo "📱 Android APK & App Bundle"
+        echo "🌐 Web Application"
+        echo "💻 Windows Desktop"
+        echo "🐧 Linux Desktop"
+        echo "🍎 macOS Desktop"
+        
+    - name: Notify failure
+      if: needs.create-release.result == 'failure'
+      run: |
+        echo "❌ Multi-platform release failed!"
+        echo "Please check the logs and fix issues before retrying."
+        exit 1

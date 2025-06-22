@@ -1,4 +1,4 @@
-name: Build APK
+name: Build Multi-Platform
 
 on:
   push:
@@ -15,75 +15,87 @@ on:
         options:
         - debug
         - release
+      platforms:
+        description: 'Platforms to build'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+        - all
+        - android
+        - web
+        - windows
+        - linux
+        - macos
 
 jobs:
   build:
     name: Build APK
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-      
+
     - name: Setup Java
       uses: actions/setup-java@v4
       with:
         distribution: 'zulu'
         java-version: '17'
-        
+
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
         flutter-version: '3.24.0'
         channel: 'stable'
         cache: true
-        
+
     - name: Get Flutter version
       run: flutter --version
-      
+
     - name: Enable desktop support
       run: flutter config --enable-linux-desktop --enable-macos-desktop --enable-windows-desktop
-      
+
     - name: Clean project
       run: flutter clean
-      
+
     - name: Get dependencies
       run: flutter pub get
-      
+
     - name: Generate code
       run: |
         flutter packages pub run build_runner build --delete-conflicting-outputs
         flutter gen-l10n
       continue-on-error: true
-      
+
     - name: Run tests
       run: flutter test --coverage
       continue-on-error: true
-      
+
     - name: Analyze code
       run: flutter analyze
       continue-on-error: true
-      
+
     - name: Build APK (Debug)
       if: github.event.inputs.build_type == 'debug' || github.event.inputs.build_type == ''
       run: flutter build apk --debug --split-per-abi
-      
+
     - name: Build APK (Release)
       if: github.event.inputs.build_type == 'release'
       run: flutter build apk --release --split-per-abi
-      
+
     - name: Get APK info
       run: |
         echo "APK files built:"
         find build/app/outputs/flutter-apk/ -name "*.apk" -exec ls -lh {} \;
-        
+
     - name: Upload APK artifacts
       uses: actions/upload-artifact@v4
       with:
         name: apk-${{ github.event.inputs.build_type || 'debug' }}-${{ github.run_number }}
         path: build/app/outputs/flutter-apk/*.apk
         retention-days: 30
-        
+
     - name: Upload test coverage
       uses: actions/upload-artifact@v4
       if: always()
@@ -91,29 +103,29 @@ jobs:
         name: coverage-${{ github.run_number }}
         path: coverage/
         retention-days: 7
-        
+
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
     needs: build
     if: always()
-    
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-      
+
     - name: Run security scan
       uses: securecodewarrior/github-action-add-sarif@v1
       continue-on-error: true
       with:
         sarif-file: 'security-scan-results.sarif'
-        
+
   notify:
     name: Notify Build Status
     runs-on: ubuntu-latest
     needs: [build, security-scan]
     if: always()
-    
+
     steps:
     - name: Notify success
       if: needs.build.result == 'success'
@@ -121,7 +133,7 @@ jobs:
         echo "✅ APK build completed successfully!"
         echo "Build type: ${{ github.event.inputs.build_type || 'debug' }}"
         echo "Commit: ${{ github.sha }}"
-        
+
     - name: Notify failure
       if: needs.build.result == 'failure'
       run: |

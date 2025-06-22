@@ -1,0 +1,270 @@
+name: Quick Build & Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build'
+        required: true
+        type: choice
+        options:
+        - android-apk
+        - android-bundle
+        - web
+        - windows
+        - linux
+        - all-mobile
+        - all-desktop
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+        - debug
+        - release
+      deploy_web:
+        description: 'Deploy web to GitHub Pages'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  quick-build:
+    name: Quick Build
+    runs-on: ${{ 
+      (github.event.inputs.platform == 'windows') && 'windows-latest' ||
+      (github.event.inputs.platform == 'macos') && 'macos-latest' ||
+      'ubuntu-latest'
+    }}
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Java (for Android)
+      if: contains(github.event.inputs.platform, 'android')
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+        
+    - name: Install Linux dependencies
+      if: github.event.inputs.platform == 'linux' || github.event.inputs.platform == 'all-desktop'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+        
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.24.0'
+        channel: 'stable'
+        cache: true
+        
+    - name: Configure Flutter platforms
+      run: |
+        case "${{ github.event.inputs.platform }}" in
+          "web"|"all-mobile")
+            flutter config --enable-web
+            ;;
+          "windows"|"all-desktop")
+            flutter config --enable-windows-desktop
+            ;;
+          "linux"|"all-desktop")
+            flutter config --enable-linux-desktop
+            ;;
+        esac
+        
+    - name: Get dependencies
+      run: flutter pub get
+      
+    - name: Generate code
+      run: |
+        flutter packages pub run build_runner build --delete-conflicting-outputs
+        flutter gen-l10n
+      continue-on-error: true
+      
+    - name: Build Android APK
+      if: github.event.inputs.platform == 'android-apk' || github.event.inputs.platform == 'all-mobile'
+      run: |
+        if [ "${{ github.event.inputs.build_type }}" = "release" ]; then
+          flutter build apk --release --split-per-abi
+        else
+          flutter build apk --debug --split-per-abi
+        fi
+        
+    - name: Build Android App Bundle
+      if: github.event.inputs.platform == 'android-bundle' || github.event.inputs.platform == 'all-mobile'
+      run: |
+        if [ "${{ github.event.inputs.build_type }}" = "release" ]; then
+          flutter build appbundle --release
+        else
+          flutter build appbundle --debug
+        fi
+        
+    - name: Build Web
+      if: github.event.inputs.platform == 'web' || github.event.inputs.platform == 'all-mobile'
+      run: |
+        if [ "${{ github.event.inputs.build_type }}" = "release" ]; then
+          flutter build web --release --web-renderer html
+        else
+          flutter build web --debug --web-renderer html
+        fi
+        
+    - name: Build Windows
+      if: github.event.inputs.platform == 'windows' || github.event.inputs.platform == 'all-desktop'
+      run: |
+        if [ "${{ github.event.inputs.build_type }}" = "release" ]; then
+          flutter build windows --release
+        else
+          flutter build windows --debug
+        fi
+      shell: bash
+      
+    - name: Build Linux
+      if: github.event.inputs.platform == 'linux' || github.event.inputs.platform == 'all-desktop'
+      run: |
+        if [ "${{ github.event.inputs.build_type }}" = "release" ]; then
+          flutter build linux --release
+        else
+          flutter build linux --debug
+        fi
+        
+    - name: Package builds
+      run: |
+        BUILD_TYPE="${{ github.event.inputs.build_type }}"
+        TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+        
+        mkdir -p packages
+        
+        # Package Android APK
+        if [ -d "build/app/outputs/flutter-apk" ]; then
+          cd build/app/outputs/flutter-apk
+          zip -r "../../../../packages/android-apk-$BUILD_TYPE-$TIMESTAMP.zip" *.apk
+          cd ../../../../
+        fi
+        
+        # Package Android App Bundle
+        if [ -d "build/app/outputs/bundle" ]; then
+          cd build/app/outputs/bundle
+          zip -r "../../../../packages/android-bundle-$BUILD_TYPE-$TIMESTAMP.zip" **/*.aab
+          cd ../../../../
+        fi
+        
+        # Package Web
+        if [ -d "build/web" ]; then
+          cd build/web
+          zip -r "../../packages/web-$BUILD_TYPE-$TIMESTAMP.zip" *
+          cd ../../
+        fi
+        
+        # Package Windows
+        if [ -d "build/windows/x64/runner" ]; then
+          cd "build/windows/x64/runner/$BUILD_TYPE"
+          zip -r "../../../../../packages/windows-$BUILD_TYPE-$TIMESTAMP.zip" *
+          cd ../../../../../
+        fi
+        
+        # Package Linux
+        if [ -d "build/linux/x64/$BUILD_TYPE/bundle" ]; then
+          cd "build/linux/x64/$BUILD_TYPE/bundle"
+          tar -czf "../../../../../packages/linux-$BUILD_TYPE-$TIMESTAMP.tar.gz" *
+          cd ../../../../../
+        fi
+        
+        echo "Packaged files:"
+        ls -la packages/
+        
+    - name: Get build information
+      id: build_info
+      run: |
+        BUILD_TYPE="${{ github.event.inputs.build_type }}"
+        PLATFORM="${{ github.event.inputs.platform }}"
+        
+        echo "build_type=$BUILD_TYPE" >> $GITHUB_OUTPUT
+        echo "platform=$PLATFORM" >> $GITHUB_OUTPUT
+        echo "timestamp=$(date +%Y%m%d_%H%M%S)" >> $GITHUB_OUTPUT
+        
+        # Calculate total size
+        if [ -d "packages" ]; then
+          TOTAL_SIZE=$(du -sh packages | cut -f1)
+          echo "total_size=$TOTAL_SIZE" >> $GITHUB_OUTPUT
+          
+          FILE_COUNT=$(find packages -type f | wc -l)
+          echo "file_count=$FILE_COUNT" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: quick-build-${{ steps.build_info.outputs.platform }}-${{ steps.build_info.outputs.build_type }}-${{ steps.build_info.outputs.timestamp }}
+        path: |
+          packages/
+          build/app/outputs/flutter-apk/*.apk
+          build/app/outputs/bundle/**/*.aab
+          build/web/
+          build/windows/x64/runner/**/*
+          build/linux/x64/**/bundle/
+        retention-days: 7
+        
+    - name: Deploy Web to GitHub Pages
+      if: github.event.inputs.deploy_web == 'true' && (github.event.inputs.platform == 'web' || github.event.inputs.platform == 'all-mobile')
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: build/web
+        
+    - name: Create quick release
+      if: github.event.inputs.build_type == 'release'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: quick-${{ steps.build_info.outputs.timestamp }}
+        name: Quick Build - ${{ steps.build_info.outputs.platform }} (${{ steps.build_info.outputs.timestamp }})
+        body: |
+          ## Quick Build Release
+          
+          **Platform**: ${{ steps.build_info.outputs.platform }}
+          **Build Type**: ${{ steps.build_info.outputs.build_type }}
+          **Build Time**: ${{ steps.build_info.outputs.timestamp }}
+          **Total Size**: ${{ steps.build_info.outputs.total_size }}
+          **Files**: ${{ steps.build_info.outputs.file_count }}
+          
+          This is a quick build for testing purposes.
+          
+          ### Downloads
+          Check the artifacts section below for download links.
+          
+          ### Installation
+          1. Download the appropriate package for your platform
+          2. Extract the files
+          3. Follow the installation instructions in the main README
+          
+        draft: false
+        prerelease: true
+        files: packages/*
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+  notify-completion:
+    name: Notify Completion
+    needs: [quick-build]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Notify success
+      if: needs.quick-build.result == 'success'
+      run: |
+        echo "✅ Quick build completed successfully!"
+        echo "Platform: ${{ github.event.inputs.platform }}"
+        echo "Build Type: ${{ github.event.inputs.build_type }}"
+        echo ""
+        echo "Artifacts are ready for download!"
+        
+    - name: Notify failure
+      if: needs.quick-build.result == 'failure'
+      run: |
+        echo "❌ Quick build failed!"
+        echo "Platform: ${{ github.event.inputs.platform }}"
+        echo "Please check the logs for details."
+        exit 1
