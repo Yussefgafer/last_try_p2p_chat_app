@@ -24,8 +24,8 @@ A revolutionary Flutter application that enables secure, decentralized peer-to-p
 
 ## 🛠️ Technology Stack
 
-- **Framework**: Flutter 3.32.4
-- **Language**: Dart 3.8.1
+- **Framework**: Flutter 3.24.0
+- **Language**: Dart 3.5.0
 - **Communication**: WebRTC, Bluetooth, HTTP/HTTPS
 - **Storage**: SQLite, Hive (local storage)
 - **Encryption**: AES-256 encryption
@@ -35,8 +35,8 @@ A revolutionary Flutter application that enables secure, decentralized peer-to-p
 ## 📱 Installation
 
 ### Prerequisites
-- Flutter SDK 3.32.4 or higher
-- Dart 3.8.1 or higher
+- Flutter SDK 3.24.0 or higher
+- Dart 3.5.0 or higher
 - Android Studio / VS Code
 - Android SDK (for Android development)
 - Xcode (for iOS development)
@@ -44,8 +44,8 @@ A revolutionary Flutter application that enables secure, decentralized peer-to-p
 ### Setup
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/p2p-chat.git
-   cd p2p-chat/p2p_chat
+   git clone https://github.com/Yussefgafer/last_try_p2p_chat_app.git
+   cd last_try_p2p_chat_app
    ```
 
 2. Install dependencies:
@@ -56,6 +56,7 @@ A revolutionary Flutter application that enables secure, decentralized peer-to-p
 3. Generate model files:
    ```bash
    flutter packages pub run build_runner build
+   flutter gen-l10n
    ```
 
 4. Run the app:
@@ -68,7 +69,7 @@ A revolutionary Flutter application that enables secure, decentralized peer-to-p
 ### AI Assistant Setup
 1. Get your Gemini API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
 2. Open the app and go to Settings > AI Settings
-3. Enter your API key and test the connection
+3. Enter your API key: `AIzaSyAxEUlXL7nQNxrNTBYQSADm3F5YSIhF-pk`
 
 ### Permissions
 The app requires the following permissions:
@@ -116,8 +117,8 @@ lib/
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/your-username/p2p-chat.git
-   cd p2p-chat
+   git clone https://github.com/Yussefgafer/last_try_p2p_chat_app.git
+   cd last_try_p2p_chat_app
    ```
 
 2. **Install dependencies**
@@ -200,7 +201,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-For support, email support@p2pchat.com or join our [Discord community](https://discord.gg/p2pchat).
+For support, create an issue on GitHub or check our documentation.
 
 ---
 
